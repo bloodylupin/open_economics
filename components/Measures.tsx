@@ -7,7 +7,7 @@ export default async function Measures({ id }: { id: number }) {
       {data && data.result && data.result.length ? (
         data.result.map((result) => <li key={result.code}>{result.title}</li>)
       ) : (
-        <li>no data for this specie.</li>
+        <li>no data for this species.</li>
       )}
     </ul>
   );
