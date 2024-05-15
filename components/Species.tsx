@@ -52,8 +52,8 @@ export default async function Species({ region }: { region: RegionType }) {
               {data.measures ? (
                 data.measures
                   .split(" - ")
-                  .map((measure) => (
-                    <li key={`${measure}-${data.id}`}>{measure}</li>
+                  .map((measure, index) => (
+                    <li key={`${measure}-${data.id}-${index}`}>{measure}</li>
                   ))
               ) : (
                 <li>no data for this species.</li>
