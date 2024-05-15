@@ -31,7 +31,7 @@ export type MySpeciesType = {
   id: number;
   category: string;
   class: string;
-}[];
+};
 
 export type MeasureResultType = {
   id: string;

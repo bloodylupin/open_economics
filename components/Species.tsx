@@ -1,62 +1,41 @@
-import { fetchMeasuresById, fetchSpeciesDataByRegion } from "@/actions/actions";
+"use client";
+
 import { RegionType } from "@/types/type";
-// import { Suspense } from "react";
-// import Measures from "./Measures";
-// import Loading from "./UI/Loading";
+import Loading from "./UI/Loading";
+import FilterButton from "./FilterButton";
+import { useFilteredSpecies } from "@/hooks/useFilteredSpecies";
 
-export default async function Species({ region }: { region: RegionType }) {
-  const data = await fetchSpeciesDataByRegion(region.identifier);
-  // const data = await fetchSpeciesDataByRegion("europe");
+export default function Species({ region }: { region: RegionType }) {
+  const { speciesDisplayed, isLoading, isError, error } = useFilteredSpecies()!;
 
-  const speciesList =
-    data &&
-    data.result &&
-    data.result.map((data) => ({
-      name: data.scientific_name,
-      id: data.taxonid,
-      category: data.category,
-      class: data.class_name,
-    }));
-
-  const filteredData =
-    speciesList &&
-    speciesList
-      .filter((species) => species.category === "VU")
-      .filter((species) => species.class === "MAMMALIA");
-
-  const measures =
-    filteredData &&
-    (await Promise.all(
-      filteredData.map(async (species) => await fetchMeasuresById(species.id))
-    ));
-
-  const speciesArray =
-    filteredData &&
-    measures &&
-    filteredData.map((data, index) => ({
-      ...data,
-      measures: measures[index]?.result
-        .map((measure) => measure.title)
-        .join(" - "),
-    }));
+  if (isLoading) return <Loading />;
+  if (isError) return `an error occurred: ${error?.message}`;
 
   return (
     <div className="grid grid-cols-3 gap-8">
-      {speciesArray && speciesArray.length ? (
-        speciesArray.map((data) => (
+      {/* {speciesArray && speciesArray.length ? (
+          speciesArray.map((data) => ( */}
+      {speciesDisplayed && speciesDisplayed.length ? (
+        speciesDisplayed.map((data) => (
           <div key={data.id} className="p-8 shadow shadow-black">
             <h2>{data.name}</h2>
-            <h2>{data.class}</h2>
-            <h3>Conservation measures</h3>
+            <h3>{data.class}</h3>
+            <h4 className="p-4 shadow shadow-black w-fit">
+              Conservation measures
+            </h4>
             <ul>
-              {data.measures ? (
-                data.measures
-                  .split(" - ")
-                  .map((measure, index) => (
-                    <li key={`${measure}-${data.id}-${index}`}>{measure}</li>
-                  ))
+              {!data.isPending ? (
+                data.measures ? (
+                  data.measures
+                    .split(" - ")
+                    .map((measure, index) => (
+                      <li key={`${measure}-${data.id}-${index}`}>{measure}</li>
+                    ))
+                ) : (
+                  <li>no data for this species.</li>
+                )
               ) : (
-                <li>no data for this species.</li>
+                <Loading />
               )}
             </ul>
 
