@@ -1,5 +1,6 @@
 import { fetchRegionsData } from "@/actions/actions";
 import FilterButton from "@/components/FilterButton";
+import InfiniteScroller from "@/components/InfiniteScroller";
 import Species from "@/components/Species";
 import Container from "@/components/UI/Container";
 import Loading from "@/components/UI/Loading";
@@ -20,11 +21,14 @@ export default async function Home() {
   return (
     <FilteredSpeciesProvider identifier={randomRegion.identifier}>
       <Container>
-        <h1>Vulnerable species from {randomRegion.name}</h1>
-        <Suspense fallback={<Loading />}>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="mb-0">Vulnerable species from {randomRegion.name}</h1>
           <FilterButton />
-          <Species region={randomRegion} />
+        </div>
+        <Suspense fallback={<Loading />}>
+          <Species />
         </Suspense>
+        <InfiniteScroller />
       </Container>
     </FilteredSpeciesProvider>
   );

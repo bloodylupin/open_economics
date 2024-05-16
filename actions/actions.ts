@@ -1,10 +1,6 @@
 "use server";
 
-import {
-  MeasureResultType,
-  RegionResultType,
-  SpeciesResultType,
-} from "@/types/type";
+import { RegionResultType } from "@/types/type";
 import axios from "axios";
 
 const fetchWrapper = async <T>(url: string): Promise<T | undefined> => {
@@ -21,16 +17,14 @@ const fetchWrapper = async <T>(url: string): Promise<T | undefined> => {
       }
     }
   } catch (error) {
-    console.error("There was an error:", error);
+    if (axios.isCancel(error)) {
+      console.log(`Request canceled`);
+    } else {
+      console.error("There was an error:", error);
+    }
     throw error;
   }
 };
 
 export const fetchRegionsData = async () =>
   await fetchWrapper<RegionResultType>("region/list");
-
-export const fetchSpeciesDataByRegion = async (identifier: string) =>
-  await fetchWrapper<SpeciesResultType>(`species/region/${identifier}/page/0`);
-
-export const fetchMeasuresById = async (id: number) =>
-  await fetchWrapper<MeasureResultType>(`measures/species/id/${id}`);

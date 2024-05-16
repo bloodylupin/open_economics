@@ -1,22 +1,18 @@
 "use client";
 
-import { RegionType } from "@/types/type";
 import Loading from "./UI/Loading";
-import FilterButton from "./FilterButton";
 import { useFilteredSpecies } from "@/hooks/useFilteredSpecies";
 
-export default function Species({ region }: { region: RegionType }) {
-  const { speciesDisplayed, isLoading, isError, error } = useFilteredSpecies()!;
+export default function Species() {
+  const { speciesArray, isLoading, isError, error } = useFilteredSpecies()!;
 
   if (isLoading) return <Loading />;
   if (isError) return `an error occurred: ${error?.message}`;
 
   return (
     <div className="grid grid-cols-3 gap-8">
-      {/* {speciesArray && speciesArray.length ? (
-          speciesArray.map((data) => ( */}
-      {speciesDisplayed && speciesDisplayed.length ? (
-        speciesDisplayed.map((data) => (
+      {speciesArray && speciesArray.length ? (
+        speciesArray.map((data) => (
           <div key={data.id} className="p-8 shadow shadow-black">
             <h2>{data.name}</h2>
             <h3>{data.class}</h3>
@@ -38,10 +34,6 @@ export default function Species({ region }: { region: RegionType }) {
                 <Loading />
               )}
             </ul>
-
-            {/* <Suspense fallback={<Loading />}>
-              <Measures id={data.id} />
-            </Suspense> */}
           </div>
         ))
       ) : (

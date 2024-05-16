@@ -1,15 +1,22 @@
 "use client";
 
-import { fetchMeasuresById, fetchSpeciesDataByRegion } from "@/actions/actions";
-import { MySpeciesType } from "@/types/type";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import {
+  MeasureResultType,
+  MySpeciesType,
+  SpeciesResultType,
+} from "@/types/type";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+
 import {
   Dispatch,
+  MutableRefObject,
   ReactNode,
   SetStateAction,
   createContext,
+  useCallback,
   useContext,
-  useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -19,7 +26,7 @@ type FilteredSpeciesContextType = {
   error: Error | null;
   isFiltered: boolean;
   setIsFiltered: Dispatch<SetStateAction<boolean>> | undefined;
-  speciesDisplayed:
+  speciesArray:
     | {
         measures: string | undefined;
         isPending: boolean;
@@ -29,6 +36,10 @@ type FilteredSpeciesContextType = {
         class: string;
       }[]
     | undefined;
+  observerRef: MutableRefObject<HTMLDivElement> | undefined;
+  pageIndex: number;
+  setPageIndex: Dispatch<SetStateAction<number>> | undefined;
+  cancelRequest: (() => void) | undefined;
 };
 
 const FilteredSpeciesContext = createContext<FilteredSpeciesContextType>({
@@ -37,9 +48,48 @@ const FilteredSpeciesContext = createContext<FilteredSpeciesContextType>({
   error: null,
   isFiltered: false,
   setIsFiltered: undefined,
-  speciesDisplayed: [],
+  speciesArray: [],
+  observerRef: undefined,
+  pageIndex: 0,
+  setPageIndex: undefined,
+  cancelRequest: undefined,
 });
 export const useFilteredSpecies = () => useContext(FilteredSpeciesContext);
+
+const fetchWrapper = async <T,>(
+  url: string,
+  signal?: AbortSignal
+): Promise<T | undefined> => {
+  try {
+    const response = await axios.get(
+      `https://apiv3.iucnredlist.org/api/v3/${url}?token=${process.env.NEXT_PUBLIC_API_KEY}`,
+      { signal }
+    );
+
+    if (response.status === 200) {
+      if (response.data.results || response.data.result) {
+        return response.data;
+      } else if (response.data.message) {
+        throw new Error(`API Request error: ${response.data.message}`);
+      }
+    }
+  } catch (error) {
+    if (axios.isCancel(error)) {
+      console.log(`Request canceled`);
+    } else {
+      console.error("There was an error:", error);
+    }
+    throw error;
+  }
+};
+
+const fetchSpeciesDataByRegion = async (identifier: string) => {
+  return fetchWrapper<SpeciesResultType>(`species/region/${identifier}/page/0`);
+};
+
+const fetchMeasuresById = async (id: number, signal?: AbortSignal) => {
+  return fetchWrapper<MeasureResultType>(`measures/species/id/${id}`, signal);
+};
 
 export default function FilteredSpeciesProvider({
   children,
@@ -49,9 +99,8 @@ export default function FilteredSpeciesProvider({
   identifier: string;
 }) {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["species"],
+    queryKey: ["species", identifier],
     queryFn: () => fetchSpeciesDataByRegion(identifier),
-    // queryFn: () => fetchSpeciesDataByRegion("europe"),
   });
 
   const speciesList: MySpeciesType[] | undefined =
@@ -64,19 +113,69 @@ export default function FilteredSpeciesProvider({
       class: data.class_name,
     }));
 
-  const filteredData =
-    speciesList && speciesList.filter((species) => species.category === "VU");
+  const [isFiltered, setIsFiltered] = useState(false);
+
+  const filteredData = speciesList
+    ? isFiltered
+      ? speciesList
+          .filter((species) => species.category === "VU")
+          .filter((species) => species.class === "MAMMALIA")
+      : speciesList.filter((species) => species.category === "VU")
+    : undefined;
+
+  const paginatedFilteredData: MySpeciesType[][] = [];
+  const SPECIES_TO_LOAD = 9;
+  const filteredDataLength = (filteredData?.length || 0) / SPECIES_TO_LOAD;
+
+  for (let i = 0; i < filteredDataLength; i++) {
+    paginatedFilteredData.push([]);
+    for (let ii = 0; ii < SPECIES_TO_LOAD; ii++) {
+      const INDEX = i * SPECIES_TO_LOAD + ii;
+      filteredData && paginatedFilteredData[i].push(filteredData[INDEX]);
+    }
+  }
+
+  const [pageIndex, setPageIndex] = useState(0);
+  const observerRef = useRef<HTMLDivElement>(null!);
+
+  const queryClient = useQueryClient();
+
+  const abortControllersRef = useRef<AbortController[]>([]);
+
+  const cancelRequest = useCallback(() => {
+    abortControllersRef.current?.forEach((controller) => controller.abort());
+    abortControllersRef.current = [];
+    queryClient.cancelQueries({
+      queryKey: ["measures"],
+    });
+  }, [queryClient]);
 
   const requests =
     filteredData &&
-    filteredData.map(
-      (species) => async () => await fetchMeasuresById(species.id)
-    );
+    filteredData
+      .filter((_, index) => index < (pageIndex + 1) * SPECIES_TO_LOAD)
+      .filter(Boolean)
+      .map((species, index) => {
+        return async () => {
+          try {
+            const controller = new AbortController();
+
+            abortControllersRef.current[index] = controller;
+            return await fetchMeasuresById(species.id, controller.signal);
+          } catch (error) {
+            if (axios.isCancel(error)) {
+              console.log("Request canceled", error.message);
+            } else {
+              console.log(error);
+            }
+          }
+        };
+      });
 
   const results = useQueries({
     queries: requests
       ? requests.map((req, index) => ({
-          queryKey: ["measures" + index],
+          queryKey: ["measures", isFiltered, index],
           queryFn: req,
         }))
       : [],
@@ -95,25 +194,15 @@ export default function FilteredSpeciesProvider({
   const speciesArray =
     filteredData &&
     measures &&
-    filteredData.map((data, index) => ({
-      ...data,
-      measures: measures[index]?.result
-        .map((measure) => measure.title)
-        .join(" - "),
-      isPending: arePending[index],
-    }));
-
-  const [isFiltered, setIsFiltered] = useState(false);
-  const [speciesDisplayed, setSpeciesDisplayed] = useState(speciesArray);
-
-  useEffect(() => {
-    if (!speciesArray?.length) return;
-    isFiltered
-      ? setSpeciesDisplayed(
-          speciesArray.filter((species) => species.class === "MAMMALIA")
-        )
-      : setSpeciesDisplayed(speciesArray);
-  }, [isFiltered, speciesArray?.length, results.pendingCount]);
+    filteredData
+      .filter((_, index) => index < (pageIndex + 1) * SPECIES_TO_LOAD)
+      .map((data, index) => ({
+        ...data,
+        measures: measures[index]?.result
+          .map((measure) => measure.title)
+          .join(" - "),
+        isPending: arePending[index],
+      }));
 
   return (
     <FilteredSpeciesContext.Provider
@@ -123,7 +212,11 @@ export default function FilteredSpeciesProvider({
         error,
         isFiltered,
         setIsFiltered,
-        speciesDisplayed,
+        speciesArray,
+        observerRef,
+        pageIndex,
+        setPageIndex,
+        cancelRequest,
       }}
     >
       {children}

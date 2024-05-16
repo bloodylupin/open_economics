@@ -3,29 +3,37 @@
  */
 import { render, screen } from "@testing-library/react";
 import Home from "./page";
-import { fetchRegionsData, fetchSpeciesDataByRegion } from "../actions/actions";
-import { RegionType } from "@/types/type";
+import { fetchRegionsData } from "../actions/actions";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const queryClient = new QueryClient();
 
 jest.mock("../components/Species", () => {
-  const MockSpecies = jest.fn(({ region }: { region: RegionType }) => {
-    return <div>{`MockSpecies for region: ${region.name}`}</div>;
+  const MockSpecies = jest.fn(() => {
+    return <div>{`MockSpecies for region`}</div>;
   });
   return MockSpecies;
+});
+jest.mock("../components/FilterButton", () => {
+  const MockFilterButton = jest.fn(() => {
+    return <button>{`MockFilterButton`}</button>;
+  });
+  return MockFilterButton;
+});
+jest.mock("../components/InfiniteScroller", () => {
+  const MockInfiniteScroller = jest.fn(() => {
+    return <div>{`MockInfiniteScroller`}</div>;
+  });
+  return MockInfiniteScroller;
 });
 
 jest.mock("../actions/actions", () => ({
   fetchRegionsData: jest.fn(),
-  fetchSpeciesDataByRegion: jest.fn(),
 }));
 
 const mockedFetchRegionsData = fetchRegionsData as jest.MockedFunction<
   typeof fetchRegionsData
 >;
-
-const mockedFetchSpeciesDataByRegion =
-  fetchSpeciesDataByRegion as jest.MockedFunction<
-    typeof fetchSpeciesDataByRegion
-  >;
 
 describe("Home Page", () => {
   beforeEach(() => {
@@ -38,73 +46,31 @@ describe("Home Page", () => {
         ],
       })
     );
-    mockedFetchSpeciesDataByRegion.mockImplementation(() =>
-      Promise.resolve({
-        result: [
-          {
-            taxonid: 1,
-            kingdom_name: "K",
-            phylum_name: "1",
-            class_name: "C",
-            order_name: "FOO",
-            family_name: "BAR",
-            genus_name: "BAZ",
-            scientific_name: "frog",
-            taxonomic_authority: "unknown",
-            infra_rank: null,
-            infra_name: null,
-            population: null,
-            category: "VU",
-            main_common_name: null,
-          },
-          {
-            taxonid: 2,
-            kingdom_name: "K",
-            phylum_name: "2",
-            class_name: "C",
-            order_name: "FOO",
-            family_name: "BAR",
-            genus_name: "BAZ",
-            scientific_name: "frog",
-            taxonomic_authority: "unknown",
-            infra_rank: null,
-            infra_name: null,
-            population: null,
-            category: "VU",
-            main_common_name: null,
-          },
-          {
-            taxonid: 3,
-            kingdom_name: "K",
-            phylum_name: "3",
-            class_name: "C",
-            order_name: "FOO",
-            family_name: "BAR",
-            genus_name: "BAZ",
-            scientific_name: "frog",
-            taxonomic_authority: "unknown",
-            infra_rank: null,
-            infra_name: null,
-            population: null,
-            category: "VU",
-            main_common_name: null,
-          },
-        ],
-      })
-    );
   });
 
   it("Will render asynchronously", async () => {
-    render(await Home());
+    render(
+      <QueryClientProvider client={queryClient}>
+        {await Home()}
+      </QueryClientProvider>
+    );
     await screen.findByRole("main");
     expect(screen.getByRole("main")).toHaveTextContent(
       /Vulnerable species from/
     );
   });
   it("Will call child components", async () => {
-    render(await Home());
+    render(
+      <QueryClientProvider client={queryClient}>
+        {await Home()}
+      </QueryClientProvider>
+    );
     await screen.findByRole("main");
     expect(jest.requireMock("../components/Species")).toHaveBeenCalled();
+    expect(jest.requireMock("../components/FilterButton")).toHaveBeenCalled();
+    expect(
+      jest.requireMock("../components/InfiniteScroller")
+    ).toHaveBeenCalled();
   });
 
   it("Renders error message when fetchRegionsData is empty", async () => {
