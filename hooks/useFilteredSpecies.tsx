@@ -56,41 +56,6 @@ const FilteredSpeciesContext = createContext<FilteredSpeciesContextType>({
 });
 export const useFilteredSpecies = () => useContext(FilteredSpeciesContext);
 
-const fetchWrapper = async <T,>(
-  url: string,
-  signal?: AbortSignal
-): Promise<T | undefined> => {
-  try {
-    const response = await axios.get(
-      `https://apiv3.iucnredlist.org/api/v3/${url}?token=${process.env.NEXT_PUBLIC_API_KEY}`,
-      { signal }
-    );
-
-    if (response.status === 200) {
-      if (response.data.results || response.data.result) {
-        return response.data;
-      } else if (response.data.message) {
-        throw new Error(`API Request error: ${response.data.message}`);
-      }
-    }
-  } catch (error) {
-    if (axios.isCancel(error)) {
-      console.log(`Request canceled`);
-    } else {
-      console.error("There was an error:", error);
-    }
-    throw error;
-  }
-};
-
-const fetchSpeciesDataByRegion = async (identifier: string) => {
-  return fetchWrapper<SpeciesResultType>(`species/region/${identifier}/page/0`);
-};
-
-const fetchMeasuresById = async (id: number, signal?: AbortSignal) => {
-  return fetchWrapper<MeasureResultType>(`measures/species/id/${id}`, signal);
-};
-
 export default function FilteredSpeciesProvider({
   children,
   identifier,
@@ -98,6 +63,42 @@ export default function FilteredSpeciesProvider({
   children: ReactNode;
   identifier: string;
 }) {
+  const fetchWrapper = async <T,>(
+    url: string,
+    signal?: AbortSignal
+  ): Promise<T | undefined> => {
+    try {
+      const response = await axios.get(
+        `https://apiv3.iucnredlist.org/api/v3/${url}?token=${process.env.NEXT_PUBLIC_API_KEY}`,
+        { signal }
+      );
+
+      if (response.status === 200) {
+        if (response.data.results || response.data.result) {
+          return response.data;
+        } else if (response.data.message) {
+          throw new Error(`API Request error: ${response.data.message}`);
+        }
+      }
+    } catch (error) {
+      if (axios.isCancel(error)) {
+        console.log(`Request canceled`);
+      } else {
+        console.error("There was an error:", error);
+      }
+      throw error;
+    }
+  };
+
+  const fetchSpeciesDataByRegion = async (identifier: string) => {
+    return fetchWrapper<SpeciesResultType>(
+      `species/region/${identifier}/page/0`
+    );
+  };
+
+  const fetchMeasuresById = async (id: number, signal?: AbortSignal) => {
+    return fetchWrapper<MeasureResultType>(`measures/species/id/${id}`, signal);
+  };
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["species", identifier],
     queryFn: () => fetchSpeciesDataByRegion(identifier),
@@ -124,7 +125,7 @@ export default function FilteredSpeciesProvider({
     : undefined;
 
   const paginatedFilteredData: MySpeciesType[][] = [];
-  const SPECIES_TO_LOAD = 9;
+  const SPECIES_TO_LOAD = 12;
   const filteredDataLength = (filteredData?.length || 0) / SPECIES_TO_LOAD;
 
   for (let i = 0; i < filteredDataLength; i++) {
