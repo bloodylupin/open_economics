@@ -8,7 +8,8 @@ Example URL for API calls
 
 ## N.B.
 
-V3 is deprecated, viewres can use the public API key from the docs examples.
+V3 is deprecated, viewers can use the public API key from the docs examples.
+_9bb4facb6d23f48efbf424bb05c0c1ef1cf6f468393bc745d42179ac4aca5fee_
 
 ---
 
